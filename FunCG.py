@@ -26,12 +26,12 @@ with tab1:
 - `sum(var, lower, upper, expr)`
 - `product(var, lower, upper, expr)`
 - `integral(var, lower, upper, expr)`
-- `limit(var, to, expr)`
+- `lim(var, to, expr)`
 - `logarithm(base, x) - base is optional, if left empty it will be replaced with e`
-- `module(x)`
+- `absolute(x)`
 - `factorial(n)`
 - `floor(x)`, `ceiling(x)`
-- `sin(x)`, `cos(x)`, `tan(x)`, `ctg(x)`
+- `sin(x)`, `cos(x)`, `tg(x)`, `ctg(x)`
 - `arcsin(x)`, `arccos(x)`, `arctg(x)`, `arcctg(x)`
 
 ### Modes
@@ -43,7 +43,7 @@ with tab1:
 **Functions Mode**
 - Enter a function of `x`
 - Example: `x^2`, `sin(x)`
-- Fixed bounds:
+- Fixed bounds: (in the furure there will be custom bounds)
   - x ∈ [-10, 10]
   - y ∈ [-8, 8]
 
@@ -52,6 +52,10 @@ with tab1:
 - Use `^` for exponentiation
 - Function names must be lowercase
 - Trigonometric input is in radians
+                
+### WARNINGS
+- although the calculation is fairly accurate, extremely large or small 
+  inputs may be mishandled, resulting in a much bigger error %
 """)
 
 # ---------------------------
@@ -67,7 +71,21 @@ with tab2:
         horizontal=True
     )
 
-    expr = st.text_input("Enter expression", placeholder="x^2 or sin(x)")
+    if mode.startswith("Functions"):
+        col1, col2 = st.columns([4, 1])  # 4:1 width ratio
+        with col2:
+            num_points = st.number_input(
+            "Number of points for graph",
+            min_value=1000,
+            max_value=100000,
+            value=10000,
+            step=1000
+            )
+    
+        with col1:
+            expr = st.text_input("Enter expression", placeholder="x^2 or sin(x)")
+    else:
+        expr = st.text_input("Enter expression", placeholder="x^2 or sin(x)")
 
     if st.button("Calculate / Plot"):
 
