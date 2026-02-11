@@ -43,7 +43,7 @@ with tab1:
 **Functions Mode**
 - Enter a function of `x`
 - Example: `x^2`, `sin(x)`
-- Fixed bounds: (in the furure there will be custom bounds)
+- Fixed bounds: (in the future custom bounds will be implemented)
   - x ∈ [-10, 10]
   - y ∈ [-8, 8]
 
@@ -54,8 +54,7 @@ with tab1:
 - Trigonometric input is in radians
                 
 ### WARNINGS
-- although the calculation is fairly accurate, extremely large or small 
-  inputs may be mishandled, resulting in a much bigger error %
+- Although the calculationa are fairly accurate (every result has a minimum of 1-2 correct decimals), errors 'might' still happen
 """)
 
 # ---------------------------
@@ -116,3 +115,4 @@ with tab2:
 
         except Exception as e:
             st.error(f"Error: {e}")
+
