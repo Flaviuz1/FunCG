@@ -2,9 +2,8 @@ import matplotlib.pyplot as plt
 import math
 from functions import evaluate
 
-
+num_points = 20000
 def plot_function(ast, x_min=-10, x_max=10, y_min=-8, y_max=8):
-    num_points = 1000
 
     x_values = []
     y_values = []
@@ -46,7 +45,5 @@ def plot_function(ast, x_min=-10, x_max=10, y_min=-8, y_max=8):
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    
-
 
     return fig
