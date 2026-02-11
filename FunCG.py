@@ -54,7 +54,7 @@ with tab1:
 - Trigonometric input is in radians
                 
 ### WARNINGS
-- Although the calculationa are fairly accurate (every result has a minimum of 1-2 correct decimals), errors 'might' still happen
+- Although the calculations are fairly accurate (every result has a minimum of 1-2 correct decimals), errors 'might' still happen
 """)
 
 # ---------------------------
@@ -115,4 +115,5 @@ with tab2:
 
         except Exception as e:
             st.error(f"Error: {e}")
+
 
