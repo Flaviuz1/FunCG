@@ -51,7 +51,7 @@ with tab1:
 - Use parentheses for grouping
 - Use `^` for exponentiation
 - Function names must be lowercase
-- Trigonometric input is in radians
+- Trigonometric input is in radians (the transformation is : x * pi / 180)
                 
 ### WARNINGS
 - Although the calculations are fairly accurate (every result has a minimum of 1-2 correct decimals), errors 'might' still happen
@@ -115,5 +115,6 @@ with tab2:
 
         except Exception as e:
             st.error(f"Error: {e}")
+
 
 
