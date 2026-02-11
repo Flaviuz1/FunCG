@@ -144,20 +144,20 @@ class Parser:
         return node
 
     def parse_factor(self):
-        node = self.parse_power()
-        while self.peek() and self.peek()[0] == OP and self.peek()[1] == '^':
+        tok = self.peek()
+        if tok and tok[1] == '-':
+            self.advance()
+            return BinaryOpNode(NumberNode(0), '-', self.parse_power())
+        return self.parse_power()
+
+    def parse_power(self):
+        node = self.parse_atom()
+        if self.peek() and self.peek()[1] == '^':
             op = self.peek()[1]
             self.advance()
             right = self.parse_power()
             node = BinaryOpNode(node, op, right)
         return node
-
-    def parse_power(self):
-        tok = self.peek()
-        if tok and tok[0] == OP and tok[1] == '-':
-            self.advance()
-            return BinaryOpNode(NumberNode(0), '-', self.parse_atom())
-        return self.parse_atom()
 
     def parse_atom(self):
         tok = self.peek()
@@ -215,7 +215,7 @@ class Parser:
         return args
 
 ISPTCPrecision = 1000
-ESCPrecision = 50
+ESCPrecision = 100
 
 def evaluate(node, variables=None):
     if variables is None:
@@ -296,24 +296,30 @@ def evaluate(node, variables=None):
         var = node.var
         a = evaluate(node.lower, variables)
         b = evaluate(node.upper, variables)
-        h = (b - a) / ISPTCPrecision
+        n = ISPTCPrecision
+        # Simpson's Rule
+        if n % 2 == 1:
+            n += 1
+        h = (b - a) / n
         total = 0.0
-        for i in range(ISPTCPrecision):
-            x0 = a + i * h
-            x1 = x0 + h
-            variables[var] = x0
-            f0 = evaluate(node.expr, variables)
-            variables[var] = x1
-            f1 = evaluate(node.expr, variables)
-            total += (f0 + f1) * h / 2
+        for i in range(n + 1):
+            x = a + i * h
+            variables[var] = x
+            f = evaluate(node.expr, variables)
+            if i == 0 or i == n:
+                total += f
+            elif i % 2 == 1:
+                total += 4 * f
+            else:
+                total += 2 * f
         del variables[var]
-        return total
+        return total * h / 3
     elif isinstance(node, LimitNode):
         var = node.var
         if not isinstance(var, str):
             raise ValueError("First argument to limit must be a variable name")
         to = evaluate(node.to, variables)
-        eps = 1e-6  # Slightly larger epsilon to avoid extreme values
+        eps = 1e-6
         try:
             variables[var] = to - eps
             left = evaluate(node.expr, variables)
@@ -439,28 +445,23 @@ def power(b : float, p : float) -> float:
 
 # Trigonometric functions
 def sin(x : float) -> float:
-    result = 0.0
     x = x % (2 * math.pi)
-    for n in range(ESCPrecision + 1):
-        sign = 1 if n % 2 == 0 else -1
-        x_power = _int_power(x, 2*n + 1)
-        term = sign * x_power / factorial(2*n + 1)
-        result += term
-    if absolute(result) < 1e-12:
-        return 0.0
-    return result
+    if x > math.pi:
+        x -= 2 * math.pi
+    elif x < -math.pi:
+        x += 2 * math.pi
+    x2 = x*x
+    return x * (1 - x2 * (1/6 - x2 * (1/120 - x2 * (1/5040 - x2 * (1/362880 - x2 * (1/39916800))))))
 
 def cos(x : float) -> float:
-    result = 0.0
     x = x % (2 * math.pi)
-    for n in range(ESCPrecision + 1):
-        sign = 1 if n % 2 == 0 else -1
-        x_power = _int_power(x, 2*n)
-        term = sign * x_power / factorial(2*n)
-        result += term
-    if abs(result) < 1e-12:
-        return 0.0
-    return result
+    if x > math.pi:
+        x -= 2 * math.pi
+    elif x < -math.pi:
+        x += 2 * math.pi
+
+    x2 = x * x
+    return 1 - x2 * (1/2 - x2 * (1/24 - x2 * (1/720 - x2 * (1/40320 - x2 * (1/3628800)))))
 
 def tg(x : float) -> float:
     s = sin(x)
@@ -478,36 +479,41 @@ def ctg(x : float) -> float:
 
 # Inverse trigonometric functions
 def arcsin(x: float) -> float:
-    if absolute(x) > 1:
-        raise ValueError("arcsin undefined (abs(x) > 1)")
-    if x < 0:
-        return -arcsin(-x)
-    if x > 0.9:
-        return math.pi/2 - arcsin(power((1 - x),1/2))
-    result = 0.0
-    for n in range(ESCPrecision + 1):
-        num = factorial(2*n)
-        denom = (power(4, n)) * (power(factorial(n),2)) * (2*n + 1)
-        term = (num / denom) * power(x,(2*n + 1))
-        result += term
-    return result
+    if abs(x) > 1:
+        raise ValueError("arcsin undefined for abs(x) > 1")
+    x2 = x * x
+    return x * (1 + x2 * (1/6 + x2 * (3/40 + x2 * (5/112 + x2 * (35/1152 + x2 * 63/2816)))))
 
 def arccos(x : float) -> float:
     return math.pi / 2 - arcsin(x)
 
-def arctg(x : float) -> float:
-    if absolute(x) <= 1:
-        result = 0.0
-        for n in range(ISPTCPrecision + 1):
-            sign = 1 if n % 2 == 0 else -1
-            x_power = _int_power(x, 2 * n + 1)
-            term = sign * x_power / (2 * n + 1)
-            result += term
-        return result
-    elif x > 0:
-        return math.pi / 2 - arctg(1/x)
-    elif x < 0:
-        return -math.pi / 2 - arctg(1/x)
+def arctg(x: float) -> float:
+    if x < 0:
+        return -arctg(-x)
+    # Coefficients for minimax rational approximation on [0, 0.66]
+    P = [
+        -8.750608600031904122785e-01,
+        -1.615753718733365076637e+01,
+        -7.500855792314704667340e+01,
+        -1.228866684490136173410e+02,
+        -6.485021904942025371773e+01,
+    ]
+
+    Q = [
+        2.485846490142306297962e+01,
+        1.650270098316988542046e+02,
+        4.328810604912902668951e+02,
+        4.853903996359136964868e+02,
+        1.945506571482613964425e+02,
+    ]
+    if x <= 0.66:
+        z = x * x
+        num = (((P[0]*z + P[1])*z + P[2])*z + P[3])*z + P[4]
+        den = ((((z + Q[0])*z + Q[1])*z + Q[2])*z + Q[3])*z + Q[4]
+        return x + x * z * num / den
+    if x <= 2.414213562373095:  # 1 + sqrt(2)
+        return math.pi/4 + arctg((x - 1) / (x + 1))
+    return math.pi/2 - arctg(1/x)
 
 def arcctg(x : float) -> float:
     return math.pi / 2 - arctg(x)
