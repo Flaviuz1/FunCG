@@ -1,12 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-
-try:
-    import math_engine
-    BACKEND = "C++ (PyBind11)"
-except ImportError:
-    import functions as math_engine
-    BACKEND = "Python"
+import math_engine
+BACKEND = "C++ (PyBind11)"
 
 app = Flask(__name__, static_folder="static")
 
