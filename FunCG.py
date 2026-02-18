@@ -1,6 +1,6 @@
 import streamlit as st
 import math
-import math_engine
+import math_engine  # C++ backend
 from graphing_utilities import plot_function
 
 st.set_page_config(page_title="FunCG", layout="wide")
@@ -20,16 +20,16 @@ with tab1:
 - `sum(var, lower, upper, expr)`
 - `product(var, lower, upper, expr)`
 - `integral(var, lower, upper, expr)`
-- `lim(var, to, expr)`
-- `logarithm(base, x) / log(base, x)` — base is optional, defaults to *e*
-- `absolute(x) / abs(x)`
+- `lim(var, to, expr) / limit(var, to, expr)`
+- `logarithm(base, x)` — base is optional, defaults to *e*
+- `absolute(x)`
 - `factorial(n)`
-- `floor(x)`, `ceiling(x) / ceil(x)`
+- `floor(x)`, `ceiling(x)`
 - `sin(x)`, `cos(x)`, `tan(x)` / `tg(x)`, `ctg(x)`
 - `arcsin(x)`, `arccos(x)`, `arctg(x)` / `arctan(x)`, `arcctg(x)`
-- `arrangements(n, k) / arra(n, k)` — A(n,k) = n! / (n-k)!
-- `combinations(n, k) / comb(n, k)` — C(n,k) = n! / (k! · (n-k)!)
-- `permutations(n) / perm(n)` — P(n) = n!
+- `arrangements(n, k)` — A(n,k) = n! / (n-k)!
+- `combinations(n, k)` — C(n,k) = n! / (k! · (n-k)!)
+- `permutations(n)` — P(n) = n!
 - `gcd(a, b)`, `lcm(a, b)` — greatest common divisor / least common multiple
 - `mod(a, b)` — remainder of a / b
 - `root(n, x)` — nth root of x
@@ -47,14 +47,15 @@ with tab1:
 - Fixed bounds: x ∈ [−10, 10], y ∈ [−8, 8]
 
 ### Writing Rules
-- Trigonometric input is in radians - the transformation is num_of_degrees * PI / 180
 - Use parentheses for grouping
 - Use `^` for exponentiation
-- Function names can be any case
+- Function names must be lowercase
+- Trigonometric input is in radians
 
 ---
 *Math engine powered by C++ (PyBind11)*
 """)
+
 
 with tab2:
     st.subheader("Calculator / Function Grapher")
@@ -73,19 +74,22 @@ with tab2:
             st.stop()
 
         try:
-            #SIMPLE MODE
+            # SIMPLE MODE
             if mode.startswith("Simple"):
                 result = math_engine.evaluate(expr)
 
+                import math as _math
                 if isinstance(result, float):
-                    if result == int(result) and abs(result) < 1e15:
+                    if not _math.isfinite(result):
+                        st.success(f"Result: {result}")
+                    elif result == int(result) and abs(result) < 1e15:
                         st.success(f"Result: {int(result)}")
                     else:
                         st.success(f"Result: {round(result, 6)}")
                 else:
                     st.success(f"Result: {result}")
 
-            #GRAPH MODE
+            # GRAPH MODE
             else:
                 fig = plot_function(expr)
                 st.pyplot(fig)
