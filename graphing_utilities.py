@@ -1,47 +1,40 @@
-import matplotlib.pyplot as plt
 import math
-from functions import evaluate
+import matplotlib.pyplot as plt
+import math_engine
 
-num_points = 20000
-def plot_function(ast, x_min=-10, x_max=10, y_min=-8, y_max=8):
 
-    x_values = []
-    y_values = []
-    
-    for i in range(num_points):
-        x = x_min + (x_max - x_min) * i / num_points
-        x_values.append(x)
+def plot_function(expr: str, x_min=-10, x_max=10, y_min=-8, y_max=8, num_points=1000):
+    """
+    Plot f(x) by evaluating it in C++.
+    Accepts the raw expression string rather than a pre-built AST.
+    """
+    xs, ys = math_engine.evaluate_for_graph(expr, x_min, x_max, num_points)
 
-        try:
-            y = evaluate(ast, {"x": x})
+    # Replace NaN and out-of-range y values with None for matplotlib
+    plot_ys = []
+    for y in ys:
+        if math.isnan(y) or not (y_min <= y <= y_max):
+            plot_ys.append(None)
+        else:
+            plot_ys.append(y)
 
-            if math.isfinite(y) and y_min <= y <= y_max:
-                y_values.append(y)
-            else:
-                y_values.append(None)
-
-        except:
-            y_values.append(None)
-
-    if all(v is None for v in y_values):
+    if all(v is None for v in plot_ys):
         raise ValueError("Function has no valid values in visible range")
-    
+
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(x_values, y_values, color = 'red', linewidth=2)
+    ax.plot(xs, plot_ys, color="red", linewidth=2)
 
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
     ax.grid(True)
 
-    # Optional: hide top and right spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     if x_min <= 0 <= x_max:
-        ax.axvline(0, color = "#000000")
-
+        ax.axvline(0, color="#000000")
     if y_min <= 0 <= y_max:
-        ax.axhline(0, color = "#000000")
+        ax.axhline(0, color="#000000")
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
