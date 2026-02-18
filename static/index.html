@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FunCG — Function Calculator & Grapher</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Anybody:wght@100;400;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ── RESET & TOKENS ─────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #070a0e;
+            --bg2: #0b1018;
+            --bg3: #101820;
+            --border: #18263a;
+            --border2: #1f334d;
+            --amber: #f0a500;
+            --amber2: #ffc94d;
+            --teal: #00d4aa;
+            --teal2: #00ffcc;
+            --red: #ff4757;
+            --text: #8fa8c0;
+            --text2: #c8daea;
+            --head: #e8f4ff;
+            --mono: 'DM Mono', monospace;
+            --display: 'Anybody', sans-serif;
+            --glow-a: 0 0 20px rgba(240, 165, 0, 0.2);
+            --glow-t: 0 0 20px rgba(0, 212, 170, 0.2);
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* scanlines */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1000;
+            background: repeating-linear-gradient(0deg,
+                    transparent, transparent 2px,
+                    rgba(0, 0, 0, 0.06) 2px, rgba(0, 0, 0, 0.06) 4px);
+        }
+
+        /* corner grid bg */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(0, 212, 170, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 170, 0.025) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* ── HEADER ─────────────────────────────────────────────── */
+        header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 32px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(11, 16, 24, 0.98) 0%, rgba(7, 10, 14, 0.95) 100%);
+            backdrop-filter: blur(8px);
+            flex-shrink: 0;
+        }
+
+        .logo {
+            font-family: var(--display);
+            font-weight: 900;
+            font-size: 22px;
+            letter-spacing: -0.5px;
+            color: var(--head);
+            display: flex;
+            align-items: baseline;
+            gap: 2px;
+        }
+
+        .logo .fun {
+            color: var(--amber);
+        }
+
+        .logo .cg {
+            color: var(--teal);
+        }
+
+        .logo sub {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--text);
+            margin-left: 8px;
+            letter-spacing: .08em;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .backend-pill {
+            font-size: 10px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 2px;
+            border: 1px solid var(--border2);
+            color: var(--teal);
+            background: rgba(0, 212, 170, 0.05);
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 2px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 3px;
+        }
+
+        .mode-tab {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: .06em;
+            padding: 5px 16px;
+            border-radius: 2px;
+            border: none;
+            cursor: pointer;
+            color: var(--text);
+            background: transparent;
+            transition: all .15s;
+            text-transform: uppercase;
+        }
+
+        .mode-tab.active {
+            background: var(--amber);
+            color: #070a0e;
+            font-weight: 500;
+        }
+
+        .mode-tab:not(.active):hover {
+            color: var(--text2);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* ── MAIN LAYOUT ─────────────────────────────────────────── */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+            padding: 0;
+        }
+
+        /* ── INPUT BAR ───────────────────────────────────────────── */
+        .input-bar {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg2);
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .input-prefix {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 15px;
+            color: var(--amber);
+            border-right: 1px solid var(--border);
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        #expr-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: var(--mono);
+            font-size: 15px;
+            color: var(--head);
+            caret-color: var(--amber);
+            padding: 16px 20px;
+            letter-spacing: .02em;
+        }
+
+        #expr-input::placeholder {
+            color: var(--border2);
+        }
+
+        .run-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 28px;
+            border: none;
+            border-left: 1px solid var(--border);
+            background: transparent;
+            cursor: pointer;
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--amber);
+            transition: all .15s;
+            flex-shrink: 0;
+        }
+
+        .run-btn:hover {
+            background: rgba(240, 165, 0, 0.08);
+        }
+
+        .run-btn:active {
+            background: rgba(240, 165, 0, 0.15);
+        }
+
+        .run-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ── GRAPH CONTROLS ──────────────────────────────────────── */
+        #graph-controls {
+            display: none;
+            align-items: center;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg3);
+            flex-shrink: 0;
+        }
+
+        #graph-controls.visible {
+            display: flex;
+        }
+
+        .ctrl-group {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 8px;
+            border-right: 1px solid var(--border);
+        }
+
+        .ctrl-group label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--text);
+            white-space: nowrap;
+        }
+
+        .ctrl-group input[type=number] {
+            width: 70px;
+            background: var(--bg);
+            border: 1px solid var(--border2);
+            color: var(--head);
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 2px;
+            outline: none;
+            transition: border-color .15s;
+        }
+
+        .ctrl-group input[type=number]:focus {
+            border-color: var(--teal);
+        }
+
+        /* ── OUTPUT AREA ─────────────────────────────────────────── */
+        #output {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* CALC RESULT */
+        #calc-result {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 60px 32px;
+        }
+
+        #calc-result.visible {
+            display: flex;
+        }
+
+        .result-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .16em;
+            color: var(--text);
+        }
+
+        .result-value {
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: clamp(32px, 6vw, 72px);
+            color: var(--amber2);
+            text-shadow: var(--glow-a);
+            word-break: break-all;
+            text-align: center;
+            animation: popIn .2s cubic-bezier(.34, 1.56, .64, 1);
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(.88);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .result-expr {
+            font-size: 12px;
+            color: var(--text);
+            opacity: .7;
+        }
+
+        /* GRAPH AREA */
+        #graph-area {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        #graph-area.visible {
+            display: flex;
+        }
+
+        #graph-canvas-wrap {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        #graph-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ERROR */
+        #error-box {
+            display: none;
+            margin: 32px auto;
+            max-width: 600px;
+            padding: 16px 20px;
+            border: 1px solid rgba(255, 71, 87, .3);
+            background: rgba(255, 71, 87, .06);
+            border-radius: 4px;
+            color: var(--red);
+            font-size: 13px;
+            animation: popIn .2s ease;
+        }
+
+        #error-box.visible {
+            display: block;
+        }
+
+        /* EMPTY STATE */
+        #empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            padding: 40px 32px;
+            opacity: .6;
+        }
+
+        #empty-state.hidden {
+            display: none;
+        }
+
+        .empty-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .empty-cell {
+            background: var(--bg2);
+            padding: 14px 18px;
+        }
+
+        .empty-cell .cat {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: var(--teal);
+            margin-bottom: 8px;
+        }
+
+        .empty-cell .examples {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .empty-cell .ex {
+            color: var(--amber);
+            font-size: 12px;
+            cursor: pointer;
+            transition: color .1s;
+        }
+
+        .empty-cell .ex:hover {
+            color: var(--amber2);
+            text-decoration: underline;
+        }
+
+        .empty-title {
+            font-family: var(--display);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        /* ── FOOTER ──────────────────────────────────────────────── */
+        footer {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 32px;
+            border-top: 1px solid var(--border);
+            background: var(--bg2);
+            font-size: 10px;
+            color: var(--text);
+            flex-shrink: 0;
+        }
+
+        footer span {
+            letter-spacing: .06em;
+        }
+
+        #status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--teal);
+            box-shadow: 0 0 6px var(--teal);
+            display: inline-block;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .4;
+            }
+        }
+
+        /* ── RESPONSIVE ──────────────────────────────────────────── */
+        @media (max-width: 600px) {
+            header {
+                padding: 14px 16px;
+            }
+
+            .header-right {
+                gap: 10px;
+            }
+
+            .mode-tab {
+                padding: 5px 10px;
+                font-size: 10px;
+            }
+
+            .logo sub {
+                display: none;
+            }
+
+            #graph-controls {
+                flex-wrap: wrap;
+            }
+
+            .ctrl-group {
+                padding: 8px 12px;
+            }
+
+            footer {
+                padding: 8px 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ── HEADER ── -->
+    <header>
+        <div class="logo">
+            <span class="fun">Fun</span><span class="cg">CG</span>
+            <sub>calculator &amp; grapher</sub>
+        </div>
+        <div class="header-right">
+            <span class="backend-pill" id="backend-label">loading...</span>
+            <div class="mode-tabs">
+                <button class="mode-tab active" id="tab-calc" onclick="setMode('calc')">Calculate</button>
+                <button class="mode-tab" id="tab-graph" onclick="setMode('graph')">Graph</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── INPUT BAR ── -->
+    <div class="input-bar">
+        <div class="input-prefix">ƒ</div>
+        <input id="expr-input" type="text" autocomplete="off" spellcheck="false"
+            placeholder="sin(pi/2)  ·  integral(x, 0, 1, x^2)  ·  sum(k, 1, 10, k^2)">
+        <button class="run-btn" onclick="run()">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3 2.5l10 5.5-10 5.5V2.5z" />
+            </svg>
+            Run
+        </button>
+    </div>
+
+    <!-- ── GRAPH CONTROLS ── -->
+    <div id="graph-controls">
+        <div class="ctrl-group">
+            <label>x min</label>
+            <input type="number" id="x-min" value="-10" step="1">
+        </div>
+        <div class="ctrl-group">
+            <label>x max</label>
+            <input type="number" id="x-max" value="10" step="1">
+        </div>
+        <div class="ctrl-group">
+            <label>y min</label>
+            <input type="number" id="y-min" value="-8" step="1">
+        </div>
+        <div class="ctrl-group">
+            <label>y max</label>
+            <input type="number" id="y-max" value="8" step="1">
+        </div>
+    </div>
+
+    <!-- ── OUTPUT ── -->
+    <main>
+        <div id="output">
+
+            <!-- empty state -->
+            <div id="empty-state">
+                <div class="empty-title">Enter an expression above</div>
+                <div class="empty-grid">
+                    <div class="empty-cell">
+                        <div class="cat">Arithmetic</div>
+                        <div class="examples">
+                            <span class="ex" onclick="tryExpr('2^10 - factorial(5)')">2^10 - factorial(5)</span>
+                            <span class="ex" onclick="tryExpr('gcd(144, 60)')">gcd(144, 60)</span>
+                            <span class="ex" onclick="tryExpr('combinations(10, 3)')">combinations(10, 3)</span>
+                        </div>
+                    </div>
+                    <div class="empty-cell">
+                        <div class="cat">Trigonometry</div>
+                        <div class="examples">
+                            <span class="ex" onclick="tryExpr('sin(pi/2)^2 + cos(pi/2)^2')">sin(pi/2)² +
+                                cos(pi/2)²</span>
+                            <span class="ex" onclick="tryExpr('arctan(1) * 4')">arctan(1) × 4</span>
+                            <span class="ex" onclick="tryExpr('sin(pi/6)')">sin(π/6)</span>
+                        </div>
+                    </div>
+                    <div class="empty-cell">
+                        <div class="cat">Calculus</div>
+                        <div class="examples">
+                            <span class="ex" onclick="tryExpr('integral(x, 0, pi, sin(x))')">∫₀^π sin(x) dx</span>
+                            <span class="ex" onclick="tryExpr('lim(x, 0, sin(x)/x)')">lim x→0 sin(x)/x</span>
+                            <span class="ex" onclick="tryExpr('sum(k, 1, 100, 1/k^2)')">Σ 1/k²</span>
+                        </div>
+                    </div>
+                    <div class="empty-cell">
+                        <div class="cat">Graphs</div>
+                        <div class="examples">
+                            <span class="ex" onclick="tryGraph('sin(x) + sin(2*x)')">sin(x) + sin(2x)</span>
+                            <span class="ex" onclick="tryGraph('x^2 * sin(1/x)')">x²·sin(1/x)</span>
+                            <span class="ex" onclick="tryGraph('e^(-x^2)')">e^(−x²)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- calc result -->
+            <div id="calc-result">
+                <div class="result-label">Result</div>
+                <div class="result-value" id="result-value"></div>
+                <div class="result-expr" id="result-expr"></div>
+            </div>
+
+            <!-- graph area -->
+            <div id="graph-area">
+                <div id="graph-canvas-wrap">
+                    <canvas id="graph-canvas"></canvas>
+                </div>
+            </div>
+
+            <!-- error -->
+            <div id="error-box"></div>
+
+        </div>
+    </main>
+
+    <!-- ── FOOTER ── -->
+    <footer>
+        <span><span id="status-dot"></span>ready</span>
+        <span id="footer-backend">—</span>
+    </footer>
+
+    <script>
+        // ── STATE ───────────────────────────────────────────────────────
+        let mode = 'calc';
+
+        function setMode(m) {
+            mode = m;
+            document.getElementById('tab-calc').classList.toggle('active', m === 'calc');
+            document.getElementById('tab-graph').classList.toggle('active', m === 'graph');
+            document.getElementById('graph-controls').classList.toggle('visible', m === 'graph');
+            clearOutput();
+            document.getElementById('expr-input').placeholder =
+                m === 'calc'
+                    ? 'sin(pi/2)  ·  integral(x, 0, 1, x^2)  ·  sum(k, 1, 10, k^2)'
+                    : 'sin(x)  ·  x^2  ·  e^(-x^2)  ·  sin(x)/x';
+            document.getElementById('expr-input').focus();
+        }
+
+        function clearOutput() {
+            document.getElementById('calc-result').classList.remove('visible');
+            document.getElementById('graph-area').classList.remove('visible');
+            document.getElementById('error-box').classList.remove('visible');
+            document.getElementById('empty-state').classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('calc-result').classList.remove('visible');
+            document.getElementById('graph-area').classList.remove('visible');
+            const box = document.getElementById('error-box');
+            box.textContent = '⚠ ' + msg;
+            box.classList.add('visible');
+        }
+
+        // ── QUICK EXAMPLES ──────────────────────────────────────────────
+        function tryExpr(expr) {
+            setMode('calc');
+            document.getElementById('expr-input').value = expr;
+            run();
+        }
+        function tryGraph(expr) {
+            setMode('graph');
+            document.getElementById('expr-input').value = expr;
+            run();
+        }
+
+        // ── RUN ─────────────────────────────────────────────────────────
+        async function run() {
+            const expr = document.getElementById('expr-input').value.trim();
+            if (!expr) return;
+            if (mode === 'calc') await runCalc(expr);
+            else await runGraph(expr);
+        }
+
+        async function runCalc(expr) {
+            try {
+                const res = await fetch('/api/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expr })
+                });
+                const data = await res.json();
+                if (data.error) { showError(data.error); return; }
+                document.getElementById('empty-state').classList.add('hidden');
+                document.getElementById('error-box').classList.remove('visible');
+                document.getElementById('graph-area').classList.remove('visible');
+                document.getElementById('result-value').textContent = data.result;
+                document.getElementById('result-expr').textContent = expr;
+                document.getElementById('calc-result').classList.add('visible');
+            } catch (e) { showError('Network error: ' + e.message); }
+        }
+
+        async function runGraph(expr) {
+            const xMin = parseFloat(document.getElementById('x-min').value);
+            const xMax = parseFloat(document.getElementById('x-max').value);
+            const yMin = parseFloat(document.getElementById('y-min').value);
+            const yMax = parseFloat(document.getElementById('y-max').value);
+            try {
+                const res = await fetch('/api/graph', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expr, x_min: xMin, x_max: xMax, points: 800 })
+                });
+                const data = await res.json();
+                if (data.error) { showError(data.error); return; }
+                document.getElementById('empty-state').classList.add('hidden');
+                document.getElementById('error-box').classList.remove('visible');
+                document.getElementById('calc-result').classList.remove('visible');
+                document.getElementById('graph-area').classList.add('visible');
+                requestAnimationFrame(() => drawGraph(data.xs, data.ys, xMin, xMax, yMin, yMax, expr));
+            } catch (e) { showError('Network error: ' + e.message); }
+        }
+
+        // ── CANVAS GRAPH ────────────────────────────────────────────────
+        function drawGraph(xs, ys, xMin, xMax, yMin, yMax, label) {
+            const wrap = document.getElementById('graph-canvas-wrap');
+            const canvas = document.getElementById('graph-canvas');
+            const dpr = window.devicePixelRatio || 1;
+            const W = wrap.clientWidth;
+            const H = wrap.clientHeight;
+            canvas.width = W * dpr;
+            canvas.height = H * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            // bg
+            ctx.fillStyle = '#070a0e';
+            ctx.fillRect(0, 0, W, H);
+
+            // grid
+            const gridColor = 'rgba(24,38,58,0.8)';
+            const axisColor = 'rgba(31,51,77,0.9)';
+
+            // vertical grid lines
+            const xSteps = 10;
+            for (let i = 0; i <= xSteps; i++) {
+                const x = i / xSteps * W;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H);
+                ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.stroke();
+            }
+            // horizontal grid lines
+            const ySteps = 8;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = i / ySteps * H;
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y);
+                ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // axes
+            const toCanvasX = v => (v - xMin) / (xMax - xMin) * W;
+            const toCanvasY = v => H - (v - yMin) / (yMax - yMin) * H;
+
+            if (yMin <= 0 && 0 <= yMax) {
+                const y0 = toCanvasY(0);
+                ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0);
+                ctx.strokeStyle = axisColor; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+            if (xMin <= 0 && 0 <= xMax) {
+                const x0 = toCanvasX(0);
+                ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0, H);
+                ctx.strokeStyle = axisColor; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+
+            // axis tick labels
+            ctx.font = '10px "DM Mono", monospace';
+            ctx.fillStyle = 'rgba(143,168,192,0.5)';
+            ctx.textAlign = 'center';
+            const xTickCount = 8;
+            for (let i = 0; i <= xTickCount; i++) {
+                const val = xMin + (xMax - xMin) * i / xTickCount;
+                const px = toCanvasX(val);
+                ctx.fillText(fmtTick(val), px, H - 4);
+            }
+            ctx.textAlign = 'right';
+            const yTickCount = 6;
+            for (let i = 0; i <= yTickCount; i++) {
+                const val = yMin + (yMax - yMin) * i / yTickCount;
+                const py = toCanvasY(val);
+                ctx.fillText(fmtTick(val), 34, py + 4);
+            }
+
+            // curve — glow pass then sharp pass
+            for (let pass = 0; pass < 2; pass++) {
+                ctx.beginPath();
+                let penDown = false;
+                for (let i = 0; i < xs.length; i++) {
+                    const y = ys[i];
+                    if (y === null || y === undefined || !isFinite(y) || y < yMin || y > yMax) {
+                        penDown = false; continue;
+                    }
+                    const cx = toCanvasX(xs[i]);
+                    const cy = toCanvasY(y);
+                    if (!penDown) { ctx.moveTo(cx, cy); penDown = true; }
+                    else ctx.lineTo(cx, cy);
+                }
+                if (pass === 0) {
+                    ctx.strokeStyle = 'rgba(0,212,170,0.15)';
+                    ctx.lineWidth = 6;
+                    ctx.shadowColor = '#00d4aa';
+                    ctx.shadowBlur = 12;
+                } else {
+                    ctx.strokeStyle = '#00d4aa';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.stroke();
+            }
+
+            // label top-right
+            ctx.font = '12px "DM Mono", monospace';
+            ctx.fillStyle = 'rgba(0,212,170,0.6)';
+            ctx.textAlign = 'right';
+            ctx.fillText('f(x) = ' + label, W - 12, 20);
+        }
+
+        function fmtTick(v) {
+            if (v === 0) return '0';
+            if (Math.abs(v) >= 1000 || (Math.abs(v) < 0.01 && v !== 0))
+                return v.toExponential(1);
+            const s = v.toPrecision(3).replace(/\.?0+$/, '');
+            return s;
+        }
+
+        // ── KEYBOARD ────────────────────────────────────────────────────
+        document.getElementById('expr-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter') run();
+        });
+
+        // ── BACKEND INFO ─────────────────────────────────────────────────
+        fetch('/api/info').then(r => r.json()).then(d => {
+            const label = d.backend || '—';
+            document.getElementById('backend-label').textContent = label;
+            document.getElementById('footer-backend').textContent = 'engine: ' + label;
+        }).catch(() => { });
+
+        // ── RESIZE REDRAW ────────────────────────────────────────────────
+        let lastGraphData = null;
+        const origRunGraph = runGraph;
+        window.addEventListener('resize', () => {
+            if (lastGraphData) {
+                const { xs, ys, xMin, xMax, yMin, yMax, label } = lastGraphData;
+                drawGraph(xs, ys, xMin, xMax, yMin, yMax, label);
+            }
+        });
+    </script>
+</body>
+
+</html>
