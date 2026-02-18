@@ -12,16 +12,13 @@
 using namespace std;
 namespace py = pybind11;
 
-static const int ESC = 100;                   // Taylor-series precision
-static const int ISPTC = 10000;               // Integral / arctg precision
-static const double M_E = 2.718281828459045;  // Euler's constant
-static const double M_PI = 3.141592653589793; // PI
+static const int ESC = 100;
+static const int ISPTC = 10000;
+static const double M_E = 2.718281828459045;
+static const double M_PI = 3.141592653589793;
 
-// Forward declarations
 double power(double b, double p);
 double logarithm(double b, double x);
-double sin_c(double x);
-double cos_c(double x);
 double arcsin_c(double x);
 double arctg_c(double x);
 
@@ -52,12 +49,12 @@ double floor_c(double x)
     int ans = 0;
     if (x >= 0)
     {
-        while (ans + 1 <= x)
+        while ((double)(ans + 1) <= x)
             ++ans;
     }
     else
     {
-        while (ans - 1 >= x)
+        while ((double)(ans) > x)
             --ans;
     }
     return (double)ans;
@@ -68,7 +65,6 @@ double ceiling_c(double x)
     double f = floor_c(x);
     return (x > f) ? f + 1 : f;
 }
-
 double integer_c(double x) { return x >= 0 ? floor_c(x) : ceiling_c(x); }
 
 double _int_power(double base, int exp)
@@ -98,13 +94,9 @@ double logarithm(double b, double x)
             return result;
         }
         else if (x > 1.5)
-        {
             return 1.0 + logarithm(M_E, x / M_E);
-        }
         else
-        {
             return -logarithm(M_E, 1.0 / x);
-        }
     }
     return logarithm(M_E, x) / logarithm(M_E, b);
 }
@@ -134,36 +126,48 @@ double power(double b, double p)
         throw domain_error("Negative base with non-integer exponent");
     if (b == M_E)
     {
-        double result = 0.0;
-        for (int i = 0; i <= ESC; ++i)
-            result += _int_power(p, i) / factorial(i);
+        // incremental: term[i] = term[i-1] * p/i  — avoids p^i overflow
+        double term = 1.0, result = 1.0;
+        for (int i = 1; i <= 100; ++i)
+        {
+            term *= p / i;
+            result += term;
+            if (fabs(term) < 1e-15 * fabs(result))
+                break;
+        }
         return result;
     }
     return power(M_E, p * logarithm(M_E, b));
 }
 
+// incremental: term[n] = term[n-1] * (-x^2) / ((2n)(2n+1))
 double sin_c(double x)
 {
     x = fmod(x, 2.0 * M_PI);
-    double result = 0.0;
-    for (int n = 0; n <= ESC; ++n)
+    double term = x, result = x;
+    for (int n = 1; n <= 50; ++n)
     {
-        double sign = (n % 2 == 0) ? 1.0 : -1.0;
-        result += sign * _int_power(x, 2 * n + 1) / factorial(2 * n + 1);
+        term *= -(x * x) / ((2 * n) * (2 * n + 1));
+        result += term;
+        if (fabs(term) < 1e-15 * fabs(result))
+            break;
     }
-    return (absolute_val(result) < 1e-12) ? 0.0 : result;
+    return fabs(result) < 1e-12 ? 0.0 : result;
 }
 
+// incremental: term[n] = term[n-1] * (-x^2) / ((2n-1)(2n))
 double cos_c(double x)
 {
     x = fmod(x, 2.0 * M_PI);
-    double result = 0.0;
-    for (int n = 0; n <= ESC; ++n)
+    double term = 1.0, result = 1.0;
+    for (int n = 1; n <= 50; ++n)
     {
-        double sign = (n % 2 == 0) ? 1.0 : -1.0;
-        result += sign * _int_power(x, 2 * n) / factorial(2 * n);
+        term *= -(x * x) / ((2 * n - 1) * (2 * n));
+        result += term;
+        if (fabs(term) < 1e-15 * fabs(result))
+            break;
     }
-    return (absolute_val(result) < 1e-12) ? 0.0 : result;
+    return fabs(result) < 1e-12 ? 0.0 : result;
 }
 
 double tg_c(double x)
@@ -182,6 +186,7 @@ double ctg_c(double x)
     return c / s;
 }
 
+// incremental: term[n] = term[n-1] * x^2 * (2n-1)^2 / (2n * (2n+1))
 double arcsin_c(double x)
 {
     if (absolute_val(x) > 1)
@@ -189,44 +194,54 @@ double arcsin_c(double x)
     if (x < 0)
         return -arcsin_c(-x);
     if (x > 0.9)
-        return M_PI / 2.0 - arcsin_c(sqrt(1.0 - x));
-    double result = 0.0;
-    for (int n = 0; n <= ESC; ++n)
+        return M_PI / 2.0 - arcsin_c(sqrt(1.0 - x * x)); // was sqrt(1-x), now correct
+    double term = x, result = x, x2 = x * x;
+    for (int n = 1; n <= 100; ++n)
     {
-        double num = (double)factorial(2 * n);
-        double denom = _int_power(4.0, n) * power((double)factorial(n), 2) * (2 * n + 1);
-        result += (num / denom) * power(x, 2 * n + 1);
+        term *= x2 * (2 * n - 1) * (2 * n - 1) / ((2 * n) * (2 * n + 1));
+        result += term;
+        if (fabs(term) < 1e-15 * fabs(result))
+            break;
     }
     return result;
 }
 
 double arccos_c(double x) { return M_PI / 2.0 - arcsin_c(x); }
 
+// Uses identity arctg(x) = pi/4 + arctg((x-1)/(x+1)) for x in (0.5, 1]
+// to avoid slow convergence near x=1
 double arctg_c(double x)
 {
-    if (absolute_val(x) <= 1.0)
-    {
-        double result = 0.0;
-        for (int n = 0; n <= ISPTC; ++n)
-        {
-            double sign = (n % 2 == 0) ? 1.0 : -1.0;
-            result += sign * _int_power(x, 2 * n + 1) / (2 * n + 1);
-        }
-        return result;
-    }
-    else if (x > 0)
-    {
+    if (x < 0)
+        return -arctg_c(-x);
+    if (x > 1.0)
         return M_PI / 2.0 - arctg_c(1.0 / x);
-    }
-    else
+    if (x > 0.5)
     {
-        return -M_PI / 2.0 - arctg_c(1.0 / x);
+        double y = (x - 1.0) / (x + 1.0); // maps (0.5,1] -> (-0.21, 0], fast convergence
+        double term = y, result = y, y2 = y * y;
+        for (int n = 1; n <= 100; ++n)
+        {
+            term *= -y2 * (2 * n - 1) / (2 * n + 1);
+            result += term;
+            if (fabs(term) < 1e-15 * fabs(result))
+                break;
+        }
+        return M_PI / 4.0 + result;
     }
+    double term = x, result = x, x2 = x * x;
+    for (int n = 1; n <= 200; ++n)
+    {
+        term *= -x2 * (2 * n - 1) / (2 * n + 1);
+        result += term;
+        if (fabs(term) < 1e-15 * fabs(result))
+            break;
+    }
+    return result;
 }
 
 double arcctg_c(double x) { return M_PI / 2.0 - arctg_c(x); }
 
-// A(n, k) = n * (n-1) * ... * (n-k+1)  — arrangements
 double arrangements(int n, int k)
 {
     if (k < 0 || k > n)
@@ -237,7 +252,6 @@ double arrangements(int n, int k)
     return result;
 }
 
-// C(n, k) = n! / (k! * (n-k)!)  — combinations
 double combinations(int n, int k)
 {
     if (k < 0 || k > n)
@@ -245,7 +259,7 @@ double combinations(int n, int k)
     if (k == 0 || k == n)
         return 1.0;
     if (k > n - k)
-        k = n - k; // use smaller side
+        k = n - k;
     double result = 1.0;
     for (int i = 0; i < k; ++i)
     {
@@ -308,17 +322,13 @@ double stat_variance(const vector<double> &a)
 {
     if (a.size() < 2)
         throw domain_error("variance: need at least 2 values");
-    double m = stat_mean(a);
-    double sum = 0;
+    double m = stat_mean(a), sum = 0;
     for (double x : a)
         sum += (x - m) * (x - m);
     return sum / a.size();
 }
 
-double stat_stdev(const vector<double> &a)
-{
-    return power(stat_variance(a), 0.5);
-}
+double stat_stdev(const vector<double> &a) { return power(stat_variance(a), 0.5); }
 
 enum TokenType
 {
@@ -351,14 +361,11 @@ vector<Token> tokenize(const string &expr)
             ++i;
             continue;
         }
-
         if (isdigit(c) || c == '.')
         {
             size_t start = i;
-            while (i < expr.size() && (isdigit(expr[i]) || expr[i] == '.' ||
-                                       expr[i] == 'e' || expr[i] == 'E' ||
-                                       ((expr[i] == '+' || expr[i] == '-') && i > 0 &&
-                                        (expr[i - 1] == 'e' || expr[i - 1] == 'E'))))
+            while (i < expr.size() && (isdigit(expr[i]) || expr[i] == '.' || expr[i] == 'e' || expr[i] == 'E' ||
+                                       ((expr[i] == '+' || expr[i] == '-') && i > 0 && (expr[i - 1] == 'e' || expr[i - 1] == 'E'))))
                 ++i;
             Token t;
             t.type = TOK_NUMBER;
@@ -410,7 +417,6 @@ vector<Token> tokenize(const string &expr)
             ++i;
             continue;
         }
-
         throw runtime_error(string("Unexpected character: ") + c);
     }
     Token end;
@@ -459,8 +465,7 @@ struct BinaryOpNode : ASTNode
 {
     NodePtr left, right;
     char op;
-    BinaryOpNode(NodePtr l, char o, NodePtr r)
-        : left(move(l)), op(o), right(move(r)) {}
+    BinaryOpNode(NodePtr l, char o, NodePtr r) : left(move(l)), op(o), right(move(r)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
         double l = left->eval(vars), r = right->eval(vars);
@@ -487,8 +492,7 @@ struct FunctionCallNode : ASTNode
 {
     string name;
     vector<NodePtr> args;
-    FunctionCallNode(string n, vector<NodePtr> a)
-        : name(move(n)), args(move(a)) {}
+    FunctionCallNode(string n, vector<NodePtr> a) : name(move(n)), args(move(a)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
         string fn = name;
@@ -580,19 +584,19 @@ struct FunctionCallNode : ASTNode
         if (fn == "arrangements" || fn == "arra")
         {
             if (a.size() != 2)
-                throw runtime_error("arrangements: 2 args (n, k)");
+                throw runtime_error("arrangements: 2 args");
             return arrangements((int)a[0], (int)a[1]);
         }
         if (fn == "combinations" || fn == "comb")
         {
             if (a.size() != 2)
-                throw runtime_error("combinations: 2 args (n, k)");
+                throw runtime_error("combinations: 2 args");
             return combinations((int)a[0], (int)a[1]);
         }
         if (fn == "permutations" || fn == "perm")
         {
             if (a.size() != 1)
-                throw runtime_error("permutations: 1 arg (n)");
+                throw runtime_error("permutations: 1 arg");
             return (double)factorial((int)a[0]);
         }
         if (fn == "gcd")
@@ -610,13 +614,13 @@ struct FunctionCallNode : ASTNode
         if (fn == "mod")
         {
             if (a.size() != 2)
-                throw runtime_error("mod: 2 args (a, b)");
+                throw runtime_error("mod: 2 args");
             return mod(a[0], a[1]);
         }
         if (fn == "root")
         {
             if (a.size() != 2)
-                throw runtime_error("root: 2 args (degree, x)");
+                throw runtime_error("root: 2 args");
             return root((int)a[0], a[1]);
         }
         if (fn == "mean")
@@ -645,8 +649,7 @@ struct SigmaSumNode : ASTNode
 {
     string var;
     NodePtr lower, upper, expr;
-    SigmaSumNode(string v, NodePtr lo, NodePtr hi, NodePtr e)
-        : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
+    SigmaSumNode(string v, NodePtr lo, NodePtr hi, NodePtr e) : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
         int lo = (int)lower->eval(vars), hi = (int)upper->eval(vars);
@@ -665,8 +668,7 @@ struct ProductNode : ASTNode
 {
     string var;
     NodePtr lower, upper, expr;
-    ProductNode(string v, NodePtr lo, NodePtr hi, NodePtr e)
-        : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
+    ProductNode(string v, NodePtr lo, NodePtr hi, NodePtr e) : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
         int lo = (int)lower->eval(vars), hi = (int)upper->eval(vars);
@@ -685,13 +687,10 @@ struct IntegralNode : ASTNode
 {
     string var;
     NodePtr lower, upper, expr;
-    IntegralNode(string v, NodePtr lo, NodePtr hi, NodePtr e)
-        : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
+    IntegralNode(string v, NodePtr lo, NodePtr hi, NodePtr e) : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
-        double a = lower->eval(vars), b = upper->eval(vars);
-        double h = (b - a) / ISPTC;
-        double total = 0;
+        double a = lower->eval(vars), b = upper->eval(vars), h = (b - a) / ISPTC, total = 0;
         for (int i = 0; i < ISPTC; ++i)
         {
             double x0 = a + i * h, x1 = x0 + h;
@@ -710,19 +709,37 @@ struct LimitNode : ASTNode
 {
     string var;
     NodePtr to, expr;
-    LimitNode(string v, NodePtr t, NodePtr e)
-        : var(v), to(move(t)), expr(move(e)) {}
+    LimitNode(string v, NodePtr t, NodePtr e) : var(v), to(move(t)), expr(move(e)) {}
     double eval(unordered_map<string, double> &vars) const override
     {
         double t = to->eval(vars);
-        double eps = 1e-6;
-        vars[var] = t - eps;
-        double left = expr->eval(vars);
-        vars[var] = t + eps;
-        double right = expr->eval(vars);
+
+        // Try progressively larger epsilons until both sides are finite and stable
+        double left = NAN, right = NAN;
+        for (double eps : {1e-4, 1e-3, 1e-2, 5e-2, 1e-1})
+        {
+            try
+            {
+                vars[var] = t + eps;
+                double r = expr->eval(vars);
+                vars[var] = t - eps;
+                double l = expr->eval(vars);
+                if (isfinite(l) && isfinite(r) && abs(l) < 1e12 && abs(r) < 1e12)
+                {
+                    left = l;
+                    right = r;
+                    break;
+                }
+            }
+            catch (...)
+            {
+            }
+        }
         vars.erase(var);
-        if (abs(left - right) < 1e-4 &&
-            abs(left) < 1e10 && abs(right) < 1e10)
+
+        if (!isfinite(left) || !isfinite(right))
+            throw runtime_error("Limit does not exist or cannot be evaluated numerically");
+        if (abs(left - right) < 1e-3 * (1 + abs(left + right) / 2))
             return (left + right) / 2.0;
         throw runtime_error("Limit does not exist (left/right limits differ)");
     }
@@ -732,17 +749,14 @@ class Parser
 {
     vector<Token> tokens;
     size_t pos;
-
     Token &peek() { return tokens[pos]; }
     Token advance() { return tokens[pos++]; }
-
     Token expect(TokenType t, const string &msg = "")
     {
         if (peek().type != t)
             throw runtime_error("Syntax error: " + (msg.empty() ? "unexpected token" : msg));
         return advance();
     }
-
     NodePtr parse_expression()
     {
         auto node = parse_term();
@@ -753,7 +767,6 @@ class Parser
         }
         return node;
     }
-
     NodePtr parse_term()
     {
         auto node = parse_factor();
@@ -764,29 +777,25 @@ class Parser
         }
         return node;
     }
-
     NodePtr parse_factor()
     {
-        auto node = parse_power();
+        auto node = parse_unary();
         while (peek().type == TOK_OP && peek().op_val == '^')
         {
             advance();
-            node = make_unique<BinaryOpNode>(move(node), '^', parse_power());
+            node = make_unique<BinaryOpNode>(move(node), '^', parse_unary());
         }
         return node;
     }
-
-    NodePtr parse_power()
+    NodePtr parse_unary()
     {
         if (peek().type == TOK_OP && peek().op_val == '-')
         {
             advance();
-            return make_unique<BinaryOpNode>(
-                make_unique<NumberNode>(0), '-', parse_atom());
+            return make_unique<BinaryOpNode>(make_unique<NumberNode>(0), '-', parse_atom());
         }
         return parse_atom();
     }
-
     vector<NodePtr> parse_arguments()
     {
         vector<NodePtr> args;
@@ -802,14 +811,12 @@ class Parser
         }
         return args;
     }
-
     string get_var_name(NodePtr &node)
     {
         if (auto *v = dynamic_cast<VariableNode *>(node.get()))
             return v->name;
         throw runtime_error("Expected variable name as first argument");
     }
-
     NodePtr parse_atom()
     {
         Token tok = peek();
@@ -824,14 +831,12 @@ class Parser
             string name = tok.str_val;
             if (peek().type == TOK_LPAREN)
             {
-                advance(); // consume (
+                advance();
                 auto args = parse_arguments();
                 expect(TOK_RPAREN, "Expected ')'");
-
                 string fn = name;
                 for (auto &c : fn)
                     c = tolower(c);
-
                 if (fn == "sum")
                 {
                     if (args.size() != 4)
@@ -876,7 +881,6 @@ class Parser
 
 public:
     Parser(vector<Token> t) : tokens(move(t)), pos(0) {}
-
     NodePtr parse()
     {
         auto node = parse_expression();
@@ -886,7 +890,6 @@ public:
     }
 };
 
-// Shared helper — parse and return AST
 NodePtr build_ast(const string &expr)
 {
     auto tokens = tokenize(expr);
@@ -907,7 +910,6 @@ double evaluate_at(const string &expr, double x)
     return ast->eval(vars);
 }
 
-// Returns {x_values, y_values} as two parallel vectors; invalid points are NaN
 pair<vector<double>, vector<double>>
 evaluate_for_graph(const string &expr, double x_min, double x_max, int num_points)
 {
@@ -921,7 +923,7 @@ evaluate_for_graph(const string &expr, double x_min, double x_max, int num_point
         {
             unordered_map<string, double> vars = {{"x", x}};
             double y = ast->eval(vars);
-            ys[i] = (isfinite(y)) ? y : numeric_limits<double>::quiet_NaN();
+            ys[i] = isfinite(y) ? y : numeric_limits<double>::quiet_NaN();
         }
         catch (...)
         {
@@ -934,20 +936,8 @@ evaluate_for_graph(const string &expr, double x_min, double x_max, int num_point
 PYBIND11_MODULE(math_engine, m)
 {
     m.doc() = "FunCG math engine — C++ backend";
-
-    m.def("evaluate", &evaluate_expr,
-          "Evaluate a math expression string and return a double",
-          py::arg("expr"));
-
-    m.def("evaluate_at", &evaluate_at,
-          "Evaluate f(x) at a single x value",
-          py::arg("expr"), py::arg("x"));
-
+    m.def("evaluate", &evaluate_expr, py::arg("expr"));
+    m.def("evaluate_at", &evaluate_at, py::arg("expr"), py::arg("x"));
     m.def("evaluate_for_graph", &evaluate_for_graph,
-          "Evaluate f(x) over a range, returns (x_list, y_list). "
-          "Invalid points are NaN.",
-          py::arg("expr"),
-          py::arg("x_min") = -10.0,
-          py::arg("x_max") = 10.0,
-          py::arg("num_points") = 1000);
+          py::arg("expr"), py::arg("x_min") = -10.0, py::arg("x_max") = 10.0, py::arg("num_points") = 1000);
 }
