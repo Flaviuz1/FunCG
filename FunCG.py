@@ -1,25 +1,19 @@
 import streamlit as st
-from functions import tokenize, Parser, evaluate
+import math
+import math_engine
 from graphing_utilities import plot_function
 
-st.set_page_config(page_title="GraphMaker Calculator", layout="wide")
-
+st.set_page_config(page_title="FunCG", layout="wide")
 st.title("FunCG")
 
-# ---------------------------
-# Tabs (replaces Tkinter notebook)
-# ---------------------------
 tab1, tab2 = st.tabs(["Instructions", "Graph / Calculator"])
 
-# ---------------------------
-# Instructions tab
-# ---------------------------
 with tab1:
     st.markdown("""
 ### Calculator Usage Guide
 
 **Basic arithmetic:** `+`, `-`, `*`, `/`, `^`  
-**Constants:** `pi`, `e`, `inf` (represents 10^8)  
+**Constants:** `pi`, `e`, `inf` (represents 10⁸)  
 **Variables:** any single letter (use `x` for graphing)
 
 ### Functions
@@ -27,94 +21,74 @@ with tab1:
 - `product(var, lower, upper, expr)`
 - `integral(var, lower, upper, expr)`
 - `lim(var, to, expr)`
-- `logarithm(base, x) - base is optional, if left empty it will be replaced with e`
-- `absolute(x)`
+- `logarithm(base, x) / log(base, x)` — base is optional, defaults to *e*
+- `absolute(x) / abs(x)`
 - `factorial(n)`
-- `floor(x)`, `ceiling(x)`
-- `sin(x)`, `cos(x)`, `tg(x)`, `ctg(x)`
-- `arcsin(x)`, `arccos(x)`, `arctg(x)`, `arcctg(x)`
+- `floor(x)`, `ceiling(x) / ceil(x)`
+- `sin(x)`, `cos(x)`, `tan(x)` / `tg(x)`, `ctg(x)`
+- `arcsin(x)`, `arccos(x)`, `arctg(x)` / `arctan(x)`, `arcctg(x)`
+- `arrangements(n, k) / arra(n, k)` — A(n,k) = n! / (n-k)!
+- `combinations(n, k) / comb(n, k)` — C(n,k) = n! / (k! · (n-k)!)
+- `permutations(n) / perm(n)` — P(n) = n!
+- `gcd(a, b)`, `lcm(a, b)` — greatest common divisor / least common multiple
+- `mod(a, b)` — remainder of a / b
+- `root(n, x)` — nth root of x
+- `mean(...)`, `variance(...)`, `stdev(...)` — pass any number of values e.g. `mean(2, 4, 6)`
 
 ### Modes
 
 **Simple Mode**
 - Enter an expression → result
-- Example: `2+2`, `sin(pi/2)`
+- Example: `2+2`, `sin(pi/2)`, `integral(x, 0, 1, x^2)`
 
 **Functions Mode**
-- Enter a function of `x`
-- Example: `x^2`, `sin(x)`
-- Fixed bounds: (in the future custom bounds will be implemented)
-  - x ∈ [-10, 10]
-  - y ∈ [-8, 8]
+- Enter a function of `x`, get a graph
+- Example: `x^2`, `sin(x)`, `1/x`
+- Fixed bounds: x ∈ [−10, 10], y ∈ [−8, 8]
 
 ### Writing Rules
+- Trigonometric input is in radians - the transformation is num_of_degrees * PI / 180
 - Use parentheses for grouping
 - Use `^` for exponentiation
-- Function names must be lowercase
-- Trigonometric input is in radians (the transformation is : x * pi / 180)
-                
-### WARNINGS
-- Although the calculations are fairly accurate (every result has a minimum of 1-2 correct decimals), errors 'might' still happen
+- Function names can be any case
+
+---
+*Math engine powered by C++ (PyBind11)*
 """)
 
-# ---------------------------
-# Calculator tab
-# ---------------------------
 with tab2:
-
     st.subheader("Calculator / Function Grapher")
 
     mode = st.radio(
         "Mode",
         ["Simple (Calculate)", "Functions (Graph f(x))"],
-        horizontal=True
+        horizontal=True,
     )
 
-    if mode.startswith("Functions"):
-        col1, col2 = st.columns([4, 1])  # 4:1 width ratio
-        with col2:
-            num_points = st.number_input(
-            "Number of points for graph",
-            min_value=1000,
-            max_value=100000,
-            value=10000,
-            step=1000
-            )
-    
-        with col1:
-            expr = st.text_input("Enter expression", placeholder="x^2 or sin(x)")
-    else:
-        expr = st.text_input("Enter expression", placeholder="x^2 or sin(x)")
+    expr = st.text_input("Enter expression", placeholder="x^2  or  sin(x)  or  integral(x, 0, 1, x^2)")
 
     if st.button("Calculate / Plot"):
-
         if not expr.strip():
             st.error("Please enter an expression.")
             st.stop()
 
         try:
-            tokens = tokenize(expr)
-            ast = Parser(tokens).parse()
-
-            # ---------------- SIMPLE MODE
+            #SIMPLE MODE
             if mode.startswith("Simple"):
-                result = evaluate(ast)
+                result = math_engine.evaluate(expr)
 
                 if isinstance(result, float):
-                    if result.is_integer():
-                        result = int(result)
+                    if result == int(result) and abs(result) < 1e15:
+                        st.success(f"Result: {int(result)}")
                     else:
-                        result = round(result, 6)
+                        st.success(f"Result: {round(result, 6)}")
+                else:
+                    st.success(f"Result: {result}")
 
-                st.success(f"Result: {result}")
-
-            # ---------------- GRAPH MODE
+            #GRAPH MODE
             else:
-                fig = plot_function(ast)
+                fig = plot_function(expr)
                 st.pyplot(fig)
 
         except Exception as e:
             st.error(f"Error: {e}")
-
-
-
