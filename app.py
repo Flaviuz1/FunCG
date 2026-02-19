@@ -21,10 +21,18 @@ def evaluate():
         if isinstance(result, float):
             if not math.isfinite(result):
                 return jsonify({"result": str(result)})
-            elif result == int(result) and abs(result) < 1e15:
-                return jsonify({"result": int(result)})
-            else:
-                return jsonify({"result": round(result, 3)})
+            # Snap to integer if very close
+            rounded_int = round(result)
+            if abs(result - rounded_int) < 1e-6 * max(1.0, abs(rounded_int)):
+                return jsonify({"result": int(rounded_int)})
+            # Round to 6 sig figs
+            from decimal import Decimal
+            import math as m
+            if result != 0:
+                magnitude = m.floor(m.log10(abs(result)))
+                factor = 10 ** (6 - 1 - magnitude)
+                result = round(result * factor) / factor
+            return jsonify({"result": result})
         return jsonify({"result": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -35,11 +43,13 @@ def graph():
     expr   = data.get("expr", "").strip()
     x_min  = float(data.get("x_min", -10))
     x_max  = float(data.get("x_max",  10))
-    points = int(data.get("points", 800))
+    y_min  = float(data.get("y_min",  -8))
+    y_max  = float(data.get("y_max",   8))
+    points = int(data.get("points", 1000))
     if not expr:
         return jsonify({"error": "Empty expression"}), 400
     try:
-        xs, ys = math_engine.evaluate_for_graph(expr, x_min, x_max, points)
+        xs, ys = math_engine.evaluate_for_graph(expr, x_min, x_max, points, y_min, y_max)
         import math
         clean_ys = [None if (y is None or not math.isfinite(y)) else y for y in ys]
         return jsonify({"xs": list(xs), "ys": clean_ys})

@@ -118,13 +118,8 @@
             gap: 2px;
         }
 
-        .logo .fun {
-            color: var(--amber);
-        }
-
-        .logo .cg {
-            color: var(--teal);
-        }
+        .logo .fun { color: var(--amber); }
+        .logo .cg  { color: var(--teal); }
 
         .logo sub {
             font-family: var(--mono);
@@ -230,9 +225,7 @@
             letter-spacing: .02em;
         }
 
-        #expr-input::placeholder {
-            color: var(--border2);
-        }
+        #expr-input::placeholder { color: var(--border2); }
 
         .run-btn {
             display: flex;
@@ -252,18 +245,9 @@
             flex-shrink: 0;
         }
 
-        .run-btn:hover {
-            background: rgba(240, 165, 0, 0.08);
-        }
-
-        .run-btn:active {
-            background: rgba(240, 165, 0, 0.15);
-        }
-
-        .run-btn svg {
-            width: 14px;
-            height: 14px;
-        }
+        .run-btn:hover  { background: rgba(240, 165, 0, 0.08); }
+        .run-btn:active { background: rgba(240, 165, 0, 0.15); }
+        .run-btn svg { width: 14px; height: 14px; }
 
         /* ── GRAPH CONTROLS ──────────────────────────────────────── */
         #graph-controls {
@@ -275,9 +259,7 @@
             flex-shrink: 0;
         }
 
-        #graph-controls.visible {
-            display: flex;
-        }
+        #graph-controls.visible { display: flex; }
 
         .ctrl-group {
             display: flex;
@@ -308,9 +290,7 @@
             transition: border-color .15s;
         }
 
-        .ctrl-group input[type=number]:focus {
-            border-color: var(--teal);
-        }
+        .ctrl-group input[type=number]:focus { border-color: var(--teal); }
 
         /* ── OUTPUT AREA ─────────────────────────────────────────── */
         #output {
@@ -331,9 +311,7 @@
             padding: 60px 32px;
         }
 
-        #calc-result.visible {
-            display: flex;
-        }
+        #calc-result.visible { display: flex; }
 
         .result-label {
             font-size: 10px;
@@ -354,15 +332,8 @@
         }
 
         @keyframes popIn {
-            from {
-                opacity: 0;
-                transform: scale(.88);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+            from { opacity: 0; transform: scale(.88); }
+            to   { opacity: 1; transform: scale(1);   }
         }
 
         .result-expr {
@@ -379,9 +350,7 @@
             min-height: 0;
         }
 
-        #graph-area.visible {
-            display: flex;
-        }
+        #graph-area.visible { display: flex; }
 
         #graph-canvas-wrap {
             flex: 1;
@@ -410,9 +379,7 @@
             animation: popIn .2s ease;
         }
 
-        #error-box.visible {
-            display: block;
-        }
+        #error-box.visible { display: block; }
 
         /* EMPTY STATE */
         #empty-state {
@@ -426,9 +393,7 @@
             opacity: .6;
         }
 
-        #empty-state.hidden {
-            display: none;
-        }
+        #empty-state.hidden { display: none; }
 
         .empty-grid {
             display: grid;
@@ -495,9 +460,7 @@
             flex-shrink: 0;
         }
 
-        footer span {
-            letter-spacing: .06em;
-        }
+        footer span { letter-spacing: .06em; }
 
         #status-dot {
             width: 6px;
@@ -511,47 +474,19 @@
         }
 
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: .4;
-            }
+            0%, 100% { opacity: 1; }
+            50%       { opacity: .4; }
         }
 
         /* ── RESPONSIVE ──────────────────────────────────────────── */
         @media (max-width: 600px) {
-            header {
-                padding: 14px 16px;
-            }
-
-            .header-right {
-                gap: 10px;
-            }
-
-            .mode-tab {
-                padding: 5px 10px;
-                font-size: 10px;
-            }
-
-            .logo sub {
-                display: none;
-            }
-
-            #graph-controls {
-                flex-wrap: wrap;
-            }
-
-            .ctrl-group {
-                padding: 8px 12px;
-            }
-
-            footer {
-                padding: 8px 16px;
-            }
+            header { padding: 14px 16px; }
+            .header-right { gap: 10px; }
+            .mode-tab { padding: 5px 10px; font-size: 10px; }
+            .logo sub { display: none; }
+            #graph-controls { flex-wrap: wrap; }
+            .ctrl-group { padding: 8px 12px; }
+            footer { padding: 8px 16px; }
         }
     </style>
 </head>
@@ -626,8 +561,7 @@
                     <div class="empty-cell">
                         <div class="cat">Trigonometry</div>
                         <div class="examples">
-                            <span class="ex" onclick="tryExpr('sin(pi/2)^2 + cos(pi/2)^2')">sin(pi/2)² +
-                                cos(pi/2)²</span>
+                            <span class="ex" onclick="tryExpr('sin(pi/2)^2 + cos(pi/2)^2')">sin(pi/2)² + cos(pi/2)²</span>
                             <span class="ex" onclick="tryExpr('arctan(1) * 4')">arctan(1) × 4</span>
                             <span class="ex" onclick="tryExpr('sin(pi/6)')">sin(π/6)</span>
                         </div>
@@ -680,6 +614,7 @@
     <script>
         // ── STATE ───────────────────────────────────────────────────────
         let mode = 'calc';
+        let lastGraphData = null;
 
         function setMode(m) {
             mode = m;
@@ -699,6 +634,7 @@
             document.getElementById('graph-area').classList.remove('visible');
             document.getElementById('error-box').classList.remove('visible');
             document.getElementById('empty-state').classList.remove('hidden');
+            lastGraphData = null;
         }
 
         function showError(msg) {
@@ -722,12 +658,13 @@
             run();
         }
 
-        // ── RUN ─────────────────────────────────────────────────────────
+        // ── LOADING ─────────────────────────────────────────────────────
         function setLoading(on) {
             document.getElementById('spinner').classList.toggle('visible', on);
             document.getElementById('run-btn').style.opacity = on ? '0.4' : '1';
         }
 
+        // ── RUN ─────────────────────────────────────────────────────────
         async function run() {
             const expr = document.getElementById('expr-input').value.trim();
             if (!expr) return;
@@ -767,7 +704,7 @@
                 const res = await fetch('/api/graph', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ expr, x_min: xMin, x_max: xMax, points: 800 })
+                    body: JSON.stringify({ expr, x_min: xMin, x_max: xMax, y_min: yMin, y_max: yMax, points: 1000 })
                 });
                 const data = await res.json();
                 if (data.error) { showError(data.error); return; }
@@ -775,6 +712,7 @@
                 document.getElementById('error-box').classList.remove('visible');
                 document.getElementById('calc-result').classList.remove('visible');
                 document.getElementById('graph-area').classList.add('visible');
+                lastGraphData = { xs: data.xs, ys: data.ys, xMin, xMax, yMin, yMax, label: expr };
                 requestAnimationFrame(() => drawGraph(data.xs, data.ys, xMin, xMax, yMin, yMax, expr));
             } catch (e) { showError('Network error: ' + e.message); }
         }
@@ -799,14 +737,12 @@
             const gridColor = 'rgba(24,38,58,0.8)';
             const axisColor = 'rgba(31,51,77,0.9)';
 
-            // vertical grid lines
             const xSteps = 10;
             for (let i = 0; i <= xSteps; i++) {
                 const x = i / xSteps * W;
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H);
                 ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.stroke();
             }
-            // horizontal grid lines
             const ySteps = 8;
             for (let i = 0; i <= ySteps; i++) {
                 const y = i / ySteps * H;
@@ -829,7 +765,7 @@
                 ctx.strokeStyle = axisColor; ctx.lineWidth = 1.5; ctx.stroke();
             }
 
-            // axis tick labels
+            // tick labels
             ctx.font = '10px "DM Mono", monospace';
             ctx.fillStyle = 'rgba(143,168,192,0.5)';
             ctx.textAlign = 'center';
@@ -875,7 +811,7 @@
                 ctx.stroke();
             }
 
-            // label top-right
+            // label
             ctx.font = '12px "DM Mono", monospace';
             ctx.fillStyle = 'rgba(0,212,170,0.6)';
             ctx.textAlign = 'right';
@@ -900,11 +836,9 @@
             const label = d.backend || '—';
             document.getElementById('backend-label').textContent = label;
             document.getElementById('footer-backend').textContent = 'engine: ' + label;
-        }).catch(() => { });
+        }).catch(() => {});
 
         // ── RESIZE REDRAW ────────────────────────────────────────────────
-        let lastGraphData = null;
-        const origRunGraph = runGraph;
         window.addEventListener('resize', () => {
             if (lastGraphData) {
                 const { xs, ys, xMin, xMax, yMin, yMax, label } = lastGraphData;

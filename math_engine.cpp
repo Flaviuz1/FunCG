@@ -578,19 +578,67 @@ double evaluate_expr(const string &expr) { auto ast = build_ast(expr); unordered
 double evaluate_at(const string &expr, double x) { auto ast = build_ast(expr); unordered_map<string,double> vars={{"x",x}}; return ast->eval(vars); }
 
 pair<vector<double>,vector<double>>
-evaluate_for_graph(const string &expr, double x_min, double x_max, int num_points)
+evaluate_for_graph(const string &expr, double x_min, double x_max, int num_points, double y_min, double y_max)
 {
     auto ast = build_ast(expr);
+
+    // Adaptive bounds: sample coarsely first to find where function is finite
+    int coarse = 200;
+    double coarse_h = (x_max - x_min) / coarse;
+    double first_finite = x_min, last_finite = x_max;
+    bool found_any = false;
+    for (int i = 0; i <= coarse; ++i) {
+        double x = x_min + i * coarse_h;
+        try {
+            unordered_map<string,double> vars = {{"x", x}};
+            double y = ast->eval(vars);
+            if (isfinite(y)) {
+                if (!found_any) first_finite = x;
+                last_finite = x;
+                found_any = true;
+            }
+        } catch (...) {}
+    }
+    if (!found_any) {
+        // return all NaN
+        return {vector<double>(num_points, 0.0), vector<double>(num_points, numeric_limits<double>::quiet_NaN())};
+    }
+    // Expand bounds slightly
+    double margin = (last_finite - first_finite) * 0.05;
+    double eff_min = max(x_min, first_finite - margin);
+    double eff_max = min(x_max, last_finite  + margin);
+    if (eff_max <= eff_min) { eff_min = x_min; eff_max = x_max; }
+
+    // Evaluate at num_points over effective range
+    double h = (eff_max - eff_min) / (num_points - 1);
     vector<double> xs(num_points), ys(num_points);
-    for (int i = 0; i < num_points; ++i)
-    {
-        double x = x_min + (x_max - x_min) * i / num_points;
+    double y_prev = numeric_limits<double>::quiet_NaN();
+
+    for (int i = 0; i < num_points; ++i) {
+        double x = eff_min + i * h;
         xs[i] = x;
         try {
             unordered_map<string,double> vars = {{"x", x}};
             double y = ast->eval(vars);
-            ys[i] = isfinite(y) ? y : numeric_limits<double>::quiet_NaN();
-        } catch (...) { ys[i] = numeric_limits<double>::quiet_NaN(); }
+            if (!isfinite(y)) { ys[i] = numeric_limits<double>::quiet_NaN(); y_prev = NAN; continue; }
+
+            // Discontinuity detection: if jump is huge relative to recent values, break the line
+            double visible_range = y_max - y_min;
+            if (isfinite(y_prev)) {
+                double jump = absolute_val(y - y_prev);
+                // Only flag as discontinuity if jump is large relative to the visible y range
+                if (jump > 2.0 * visible_range) {
+                    ys[i] = numeric_limits<double>::quiet_NaN();
+                    y_prev = NAN;
+                    continue;
+                }
+            }
+            ys[i] = y;
+            y_prev = y;
+        } catch (...) {
+            ys[i] = numeric_limits<double>::quiet_NaN();
+            y_prev = NAN;
+        }
     }
     return {xs, ys};
 }
@@ -601,5 +649,6 @@ PYBIND11_MODULE(math_engine, m)
     m.def("evaluate",         &evaluate_expr,     py::arg("expr"));
     m.def("evaluate_at",      &evaluate_at,       py::arg("expr"), py::arg("x"));
     m.def("evaluate_for_graph", &evaluate_for_graph,
-          py::arg("expr"), py::arg("x_min")=-10.0, py::arg("x_max")=10.0, py::arg("num_points")=10000);
+      py::arg("expr"), py::arg("x_min")=-10.0, py::arg("x_max")=10.0,
+      py::arg("num_points")=1000, py::arg("y_min")=-8.0, py::arg("y_max")=8.0);
 }
