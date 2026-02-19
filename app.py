@@ -24,7 +24,7 @@ def evaluate():
             elif result == int(result) and abs(result) < 1e15:
                 return jsonify({"result": int(result)})
             else:
-                return jsonify({"result": round(result, 8)})
+                return jsonify({"result": round(result, 3)})
         return jsonify({"result": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 400

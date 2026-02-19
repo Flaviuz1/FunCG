@@ -9,6 +9,20 @@
         href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Anybody:wght@100;400;700;900&display=swap"
         rel="stylesheet">
     <style>
+        /* ── SPINNER ── */
+        .spinner {
+            display: none;
+            align-self: center;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(240,165,0,0.2);
+            border-top-color: var(--amber);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            flex-shrink: 0;
+        }
+        .spinner.visible { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         /* ── RESET & TOKENS ─────────────────────────────────────── */
         *,
         *::before,
@@ -564,7 +578,8 @@
         <div class="input-prefix">ƒ</div>
         <input id="expr-input" type="text" autocomplete="off" spellcheck="false"
             placeholder="sin(pi/2)  ·  integral(x, 0, 1, x^2)  ·  sum(k, 1, 10, k^2)">
-        <button class="run-btn" onclick="run()">
+        <div class="spinner" id="spinner"></div>
+        <button class="run-btn" id="run-btn" onclick="run()">
             <svg viewBox="0 0 16 16" fill="currentColor">
                 <path d="M3 2.5l10 5.5-10 5.5V2.5z" />
             </svg>
@@ -708,11 +723,21 @@
         }
 
         // ── RUN ─────────────────────────────────────────────────────────
+        function setLoading(on) {
+            document.getElementById('spinner').classList.toggle('visible', on);
+            document.getElementById('run-btn').style.opacity = on ? '0.4' : '1';
+        }
+
         async function run() {
             const expr = document.getElementById('expr-input').value.trim();
             if (!expr) return;
-            if (mode === 'calc') await runCalc(expr);
-            else await runGraph(expr);
+            setLoading(true);
+            try {
+                if (mode === 'calc') await runCalc(expr);
+                else await runGraph(expr);
+            } finally {
+                setLoading(false);
+            }
         }
 
         async function runCalc(expr) {

@@ -12,7 +12,7 @@
 using namespace std;
 namespace py = pybind11;
 
-static const int ESC = 100;
+static const int ESC = 150;
 static const int ISPTC = 10000;
 static const double MY_E  = 2.718281828459045;
 static const double MY_PI = 3.141592653589793;
@@ -40,14 +40,19 @@ double absolute_val(double x) { return x < 0 ? -x : x; }
 
 double floor_c(double x)
 {
-    int ans = 0;
-    if (x >= 0) { while ((double)(ans + 1) <= x) ++ans; }
-    else        { while ((double)(ans) > x) --ans; }
-    return (double)ans;
+    double r = (double)(long long)x;
+    if (r > x) r -= 1.0;
+    return r;
 }
 
-double ceiling_c(double x) { double f = floor_c(x); return (x > f) ? f + 1 : f; }
-double integer_c(double x) { return x >= 0 ? floor_c(x) : ceiling_c(x); }
+double ceiling_c(double x)
+{
+    double r = (double)(long long)x;
+    if (r < x) r += 1.0;
+    return r;
+}
+
+double integer_c(double x) { return (double)(long long)x; }
 
 double _int_power(double base, int exp)
 {
@@ -62,18 +67,17 @@ double logarithm(double b, double x)
     if (b == MY_E)
     {
         if (x == 1.0) return 0.0;
-        if (x >= 0.5 && x <= 1.5)
+        int exp2;
+        double mantissa = frexp(x, &exp2);
+        if (mantissa < 0.75) { mantissa *= 2.0; exp2--; }
+        double t = mantissa - 1.0, result = 0.0;
+        for (int n = 1; n <= ESC; ++n)
         {
-            double t = x - 1.0, result = 0.0;
-            for (int n = 1; n <= ESC; ++n)
-            {
-                double sign = ((n + 1) % 2 == 0) ? 1.0 : -1.0;
-                result += sign * _int_power(t, n) / n;
-            }
-            return result;
+            double sign = ((n + 1) % 2 == 0) ? 1.0 : -1.0;
+            result += sign * _int_power(t, n) / n;
         }
-        else if (x > 1.5) return 1.0 + logarithm(MY_E, x / MY_E);
-        else return -logarithm(MY_E, 1.0 / x);
+        static const double LN2 = 0.6931471805599453;
+        return result + exp2 * LN2;
     }
     return logarithm(MY_E, x) / logarithm(MY_E, b);
 }
@@ -83,8 +87,7 @@ double power(double b, double p)
     if (b == 1.0) return 1.0;
     if (p == 0.0) return 1.0;
     if (b == 0.0) { if (p > 0) return 0.0; throw domain_error("0^(negative) is undefined"); }
-    if (p == integer_c(p))
-    {
+    if (p == integer_c(p) && absolute_val(p) <= 100) {
         double ans = 1.0;
         int exp = (int)absolute_val(p);
         double base = (p > 0) ? b : 1.0 / b;
@@ -92,9 +95,8 @@ double power(double b, double p)
         return ans;
     }
     if (b < 0) throw domain_error("Negative base with non-integer exponent");
-    if (b == MY_E)
-    {
-        // incremental: term[i] = term[i-1] * p/i  — avoids p^i overflow
+    if (b == MY_E) {
+        if (p < 0) return 1.0 / power(MY_E, -p);  // avoid cancellation
         double term = 1.0, result = 1.0;
         for (int i = 1; i <= 100; ++i)
         {
@@ -107,32 +109,41 @@ double power(double b, double p)
     return power(MY_E, p * logarithm(MY_E, b));
 }
 
-// incremental: term[n] = term[n-1] * (-x^2) / ((2n)(2n+1))
 double sin_c(double x)
 {
+    // Reduce to [-pi, pi]
     x = fmod(x, 2.0 * MY_PI);
+    if (x > MY_PI)  x -= 2.0 * MY_PI;
+    if (x < -MY_PI) x += 2.0 * MY_PI;
+    // Reduce to [-pi/2, pi/2] using sin(pi - x) = sin(x)
+    if (x > MY_PI / 2.0)  x = MY_PI - x;
+    if (x < -MY_PI / 2.0) x = -MY_PI - x;
+    // Now Taylor on small x converges in very few terms
     double term = x, result = x;
-    for (int n = 1; n <= 50; ++n)
-    {
-        term *= -(x * x) / ((2 * n) * (2 * n + 1));
+    for (int n = 1; n <= 20; ++n) {
+        term *= -(x * x) / ((2*n) * (2*n + 1));
         result += term;
         if (fabs(term) < 1e-15 * fabs(result)) break;
     }
     return fabs(result) < 1e-12 ? 0.0 : result;
 }
 
-// incremental: term[n] = term[n-1] * (-x^2) / ((2n-1)(2n))
 double cos_c(double x)
 {
     x = fmod(x, 2.0 * MY_PI);
+    if (x > MY_PI)  x -= 2.0 * MY_PI;
+    if (x < -MY_PI) x += 2.0 * MY_PI;
+    // cos(pi - x) = -cos(x)
+    double sign = 1.0;
+    if (x > MY_PI / 2.0)  { x = MY_PI - x; sign = -1.0; }
+    if (x < -MY_PI / 2.0) { x = -MY_PI - x; sign = -1.0; }
     double term = 1.0, result = 1.0;
-    for (int n = 1; n <= 50; ++n)
-    {
-        term *= -(x * x) / ((2 * n - 1) * (2 * n));
+    for (int n = 1; n <= 20; ++n) {
+        term *= -(x * x) / ((2*n - 1) * (2*n));
         result += term;
         if (fabs(term) < 1e-15 * fabs(result)) break;
     }
-    return fabs(result) < 1e-12 ? 0.0 : result;
+    return fabs(result) < 1e-12 ? 0.0 : sign * result;
 }
 
 double tg_c(double x)
@@ -401,14 +412,65 @@ struct IntegralNode : ASTNode {
     string var; NodePtr lower, upper, expr;
     IntegralNode(string v, NodePtr lo, NodePtr hi, NodePtr e) : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
     double eval(unordered_map<string,double>&vars) const override {
-        double a = lower->eval(vars), b = upper->eval(vars), h = (b - a) / ISPTC, total = 0;
-        for (int i = 0; i < ISPTC; ++i) {
-            double x0 = a + i*h, x1 = x0 + h;
-            vars[var] = x0; double f0 = expr->eval(vars);
-            vars[var] = x1; double f1 = expr->eval(vars);
-            total += (f0 + f1) * h / 2.0;
+        double a = lower->eval(vars), b = upper->eval(vars);
+
+        bool inf_upper = (b >= 1e7);
+        bool inf_lower = (a <= -1e7);
+
+        // 5-point Gauss-Legendre nodes and weights on [-1, 1]
+        static const double GL_X[] = {-0.9061798459, -0.5384693101, 0.0, 0.5384693101, 0.9061798459};
+        static const double GL_W[] = { 0.2369268851,  0.4786286705, 0.5688888889, 0.4786286705, 0.2369268851};
+
+        auto feval = [&](double x) -> double {
+            vars[var] = x;
+            try { double v = expr->eval(vars); return isfinite(v) ? v : 0.0; } catch(...) { return 0.0; }
+        };
+
+        auto gl_integrate = [&](double lo, double hi) -> double {
+            double mid = (lo + hi) / 2.0, half = (hi - lo) / 2.0, sum = 0;
+            for (int k = 0; k < 5; ++k)
+                sum += GL_W[k] * feval(mid + half * GL_X[k]);
+            return sum * half;
+        };
+
+        if (inf_upper && !inf_lower) {
+            double eff_b = a + 80.0;
+            int panels = ISPTC / 5;
+            double panel_h = (eff_b - a) / panels, total = 0;
+            for (int p = 0; p < panels; ++p)
+                total += gl_integrate(a + p * panel_h, a + (p+1) * panel_h);
+            vars.erase(var);
+            return total;
         }
-        vars.erase(var); return total;
+
+        if (inf_lower && !inf_upper) {
+            double eff_a = b - 80.0;
+            int panels = ISPTC / 5;
+            double panel_h = (b - eff_a) / panels, total = 0;
+            for (int p = 0; p < panels; ++p)
+                total += gl_integrate(eff_a + p * panel_h, eff_a + (p+1) * panel_h);
+            vars.erase(var);
+            return total;
+        }
+
+        if (inf_lower && inf_upper) {
+            int panels = ISPTC / 5;
+            double panel_h = 160.0 / panels, total = 0;
+            for (int p = 0; p < panels; ++p)
+                total += gl_integrate(-80.0 + p * panel_h, -80.0 + (p+1) * panel_h);
+            vars.erase(var);
+            return total;
+        }
+
+        // ── finite bounds
+        int panels = ISPTC / 5;
+        double panel_h = (b - a) / panels, total = 0;
+        for (int p = 0; p < panels; ++p) {
+            double pa = a + p * panel_h, pb = pa + panel_h;
+            total += gl_integrate(pa, pb);
+        }
+        vars.erase(var);
+        return total;
     }
 };
 
@@ -421,14 +483,15 @@ struct LimitNode : ASTNode {
         // Try progressively larger epsilons until both sides are finite and stable
         double left = NAN, right = NAN;
         for (double eps : {1e-4, 1e-3, 1e-2, 5e-2, 1e-1}) {
-            try {
-                vars[var] = t + eps; double r = expr->eval(vars);
-                vars[var] = t - eps; double l = expr->eval(vars);
-                if (isfinite(l) && isfinite(r) && abs(l) < 1e12 && abs(r) < 1e12) {
-                    left = l; right = r;
-                    break;
-                }
-            } catch (...) {}
+            try { vars[var] = t + eps; right = expr->eval(vars); } catch(...) { right = NAN; }
+            try { vars[var] = t - eps; left  = expr->eval(vars); } catch(...) { left  = NAN; }
+            
+            bool r_ok = isfinite(right) && abs(right) < 1e12;
+            bool l_ok = isfinite(left)  && abs(left)  < 1e12;
+            
+            if (r_ok && l_ok) break;  // both sides good, use them
+            if (r_ok && !l_ok) { left = right; break; }  // one-sided from right
+            if (l_ok && !r_ok) { right = left; break; }  // one-sided from left
         }
         vars.erase(var);
 
@@ -463,12 +526,12 @@ class Parser {
     NodePtr parse_factor() {
         auto node = parse_unary();
         while (peek().type == TOK_OP && peek().op_val == '^')
-            { advance(); node = make_unique<BinaryOpNode>(move(node), '^', parse_unary()); }
+            { advance(); return make_unique<BinaryOpNode>(move(node), '^', parse_factor()); }
         return node;
     }
     NodePtr parse_unary() {
         if (peek().type == TOK_OP && peek().op_val == '-')
-            { advance(); return make_unique<BinaryOpNode>(make_unique<NumberNode>(0), '-', parse_atom()); }
+            { advance(); return make_unique<BinaryOpNode>(make_unique<NumberNode>(0), '-', parse_factor()); }
         return parse_atom();
     }
     vector<NodePtr> parse_arguments() {
@@ -538,5 +601,5 @@ PYBIND11_MODULE(math_engine, m)
     m.def("evaluate",         &evaluate_expr,     py::arg("expr"));
     m.def("evaluate_at",      &evaluate_at,       py::arg("expr"), py::arg("x"));
     m.def("evaluate_for_graph", &evaluate_for_graph,
-          py::arg("expr"), py::arg("x_min")=-10.0, py::arg("x_max")=10.0, py::arg("num_points")=1000);
+          py::arg("expr"), py::arg("x_min")=-10.0, py::arg("x_max")=10.0, py::arg("num_points")=10000);
 }
