@@ -392,8 +392,8 @@ struct SigmaSumNode : ASTNode {
     string var; NodePtr lower, upper, expr;
     SigmaSumNode(string v, NodePtr lo, NodePtr hi, NodePtr e) : var(v), lower(move(lo)), upper(move(hi)), expr(move(e)) {}
     double eval(unordered_map<string,double>&vars) const override {
-        int lo = (int)lower->eval(vars), hi = (int)upper->eval(vars); double total = 0;
-        for (int i = lo; i <= hi; ++i) { vars[var] = i; total += expr->eval(vars); }
+        int lo = (int)lower->eval(vars), hi = (int)upper->eval(vars); double total = 0; int minuscule_iterations = 0; double last_total = 0;
+        for (int i = lo; i <= hi; ++i) { vars[var] = i; total += expr->eval(vars); minuscule_iterations = (abs(total - last_total) < 1e-10)? minuscule_iterations + 1 : 0; last_total = total; if (minuscule_iterations >= 15) { break; } }
         vars.erase(var); return total;
     }
 };
