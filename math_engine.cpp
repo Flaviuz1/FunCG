@@ -28,6 +28,7 @@ int factorial_memo_max = 1;
 long long factorial(int x)
 {
     if (x < 0) throw domain_error("factorial of negative number");
+    if (x > 100) throw domain_error("factorial of too large number");
     auto it = factorial_memo.find(x);
     if (it != factorial_memo.end()) return it->second;
     long long ans = factorial_memo[factorial_memo_max];
